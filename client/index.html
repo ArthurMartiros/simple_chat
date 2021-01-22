@@ -1,0 +1,92 @@
+<html>
+
+<head>
+    <script>
+        let name = window.prompt('Type Your Name Please');
+        while (!name) {
+            name = window.prompt('Type Your Name Please');
+        }
+        document.cookie = 'user=' + name + '; path=/';
+        const socket = new WebSocket('ws://localhost:8888');
+        // const xhr = new XMLHttpRequest()
+        // xhr.withCredentials = true
+        socket.onopen = function(data) {
+            const sendBtn = document.querySelector('#send');
+            const messages = document.querySelector('#messages');
+            const messageBox = document.querySelector('#messageBox');
+            const badWordIndicator = document.querySelector('#badwords');
+
+            function showMessage(message) {
+                messages.textContent += `\n\n${message}`;
+                messages.scrollTop = messages.scrollHeight;
+                messageBox.value = '';
+            }
+            socket.onmessage = function(content) {
+                console.log('Datta===>: ', typeof content, content);
+
+                if (content) {
+                    const res = JSON.parse(content.data);
+                    if (res.all) {
+                        res.all.forEach(elem => {
+                            showMessage(`${new Date(elem.date).toLocaleString()} \n${elem.userId}: ${elem.text}`)
+                        });
+                        if (res.hasBadWords) {
+                            badWordIndicator.textContent = 'This Content Contains Bad Words!';
+                        }
+                    } else {
+                        const {
+                            userId,
+                            payload
+                        } = res;
+                        showMessage(`${new Date(payload.date).toLocaleString()} \n${userId}: ${payload.content}`)
+                    }
+                }
+            };
+            socket.onclose = function() {
+                socket = null;
+            }
+            sendBtn.onclick = function() {
+                if (!socket) {
+                    showMessage("No WebSocket connection :(");
+                    return;
+                }
+                socket.send(
+                    JSON.stringify({
+                        event: 'events',
+                        data: {
+                            content: messageBox.value,
+                            date: Date.now()
+                        }
+                    }));
+                // xhr.addEventListener('readystatechange', function() {
+                //     if (this.readyState === this.DONE) {
+                //         console.log(this.responseText)
+                //     }
+                // })
+
+                // xhr.open('POST', 'http://localhost:8888/send')
+                // xhr.setRequestHeader('content-type', 'application/json')
+                // xhr.setRequestHeader('authorization', 'Bearer 123abc456def')
+
+                // xhr.send(JSON.stringify({
+                //     userId: name,
+                //     payload: {
+                //         content: messageBox.value,
+                //         date: new Date()
+                //     }
+                // }))
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <h1>Real Time Messaging</h1>
+    <span id="badwords"></span>
+    <pre id="messages" style="height: 400px; overflow: scroll"></pre>
+    <input type="text" id="messageBox" placeholder="Type your message here" style="display: block; width: 100%; margin-bottom: 10px; padding: 10px;" />
+    <button id="send" title="Send Message!" style="width: 100%; height: 30px;">Send Message</button>
+
+</body>
+
+</html>
