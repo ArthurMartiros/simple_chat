@@ -2,8 +2,6 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createClient, RedisClient } from 'redis';
 import { CONFIG } from 'src/utils/config';
 import { IMessage } from './interfaces/message.interface';
-import { MainWorker } from './workers';
-import {isMainThread} from 'worker_threads';
 
 @Injectable()
 export class EventsService implements OnModuleInit, OnModuleDestroy {
@@ -34,21 +32,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     this.connectionPool[client.userId] = this.connectionPool[
         client.userId
       ].filter(p => p.id !== client.id);
+      console.log('ClientID===>: ', client.id);
     this.allClients = this.allClients.filter(p => p.id !== client.id);
   }
   
   constructor() {
     const postfix = process.pid;
     this.channelId = CONFIG().channel_prefix + postfix
-
-    // setInterval(() => {
-    // this.sendMessage(
-    //     'name',
-    //     new Date().toLocaleTimeString() +
-    //     ` | from server on port ${process.env['PORT']}`,
-    //     false,
-    // );
-    // }, 3000);
   }
 
   async onModuleInit() {
@@ -61,7 +51,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
     this.subscriber.on('message', (channel, message) => {
       const { userId, payload } = JSON.parse(message);
-      console.log('Steaaa===>: ', userId, payload);
+      console.log('Redis Message===>: ', userId, payload);
       this.sendMessage(userId, payload, true);
     });
 
@@ -95,12 +85,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   public async onModuleDestroy() {
-      console.log('Destroyed')
     this.refreshInterval && clearTimeout(this.refreshInterval);
   }
 
   public async sendMessage(userId: string, payload: IMessage, fromRedis: boolean) {    
-    console.log('All==>: ',process.pid, this.allClients.map(i=> i.userId));
+    console.log('AllClients===>: ',process.pid, this.allClients.map(i=> i.userId));
     this.allClients.forEach(socket =>
         socket.send(JSON.stringify({userId, payload})),
     );

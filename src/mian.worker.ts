@@ -2,8 +2,8 @@ import { Worker }  from 'worker_threads';
 
 
 export class MainWorker extends Worker {
-    constructor(data = null) {
-        super(`${__dirname}/checker.js`, {
+    constructor(path: string, data = null) {
+        super(`${__dirname}/${path}`, {
             workerData: data
         });
        

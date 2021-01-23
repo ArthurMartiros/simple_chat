@@ -6,7 +6,6 @@ import * as cluster from 'cluster';
 import * as os from 'os'
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { EventsService } from './events/events.service';
 import { ValidationPipe } from '@nestjs/common';
 
 async function makeServer(type: string) {
@@ -22,7 +21,7 @@ async function makeServer(type: string) {
 }
 
 async function bootstrap() {
-  console.log('Config==>: ', CONFIG());
+  console.log('Config===>: ', CONFIG());
   if (cluster.isMaster) {
     if(CONFIG().isDevEnvironment()) {
       await makeServer('MASTER')
@@ -33,7 +32,7 @@ async function bootstrap() {
       for (let i = 0; i < numCPUs; i++) {
         cluster.fork();
       }
-  
+      
       cluster.on('exit', (worker, code, signal) => {
         console.log(`worker ${worker.process.pid} died`);
       });

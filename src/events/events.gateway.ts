@@ -1,20 +1,18 @@
-import { BadRequestException, Inject } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  WsResponse,
 } from '@nestjs/websockets';
 import { Model } from 'mongoose';
-import { from, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { isMainThread } from 'worker_threads';
 import { Server } from 'ws';
 import { Message, MessageDocument } from './entities/message.entity';
 import { EventsService } from './events.service';
 import { IMessage } from './interfaces/message.interface';
-import { MainWorker } from './workers';
+import { MainWorker } from '../mian.worker';
+import * as uniqid from 'uniqid';
 
 @WebSocketGateway()
 export class EventsGateway {
@@ -34,44 +32,41 @@ export class EventsGateway {
   }
 
   async handleConnection(client: any, req: Request) {
-    const token = this.getToken(req.headers['cookie']);
+    try {
+      const token = this.getToken(req.headers['cookie']);
     
-    client.userId = token;
-    console.log('Token==>: ', token);
-    this.service.addClient(client);
-    const res = await this.messageModel.find().exec();
-    let hasBadWords = false;
-    if(isMainThread) {
-      const worker = new MainWorker(res);
-      worker.postMessage(res);
-      hasBadWords = (await worker.getMessage() as any).data;
-    } else {
-      console.log('Inside Worker Thread!');
+      client.userId = token;
+      client.id = uniqid();
+      console.log('Token==>: ', token);
+      this.service.addClient(client);
+      const res = await this.messageModel.find().exec();
+      let hasBadWords = false;
+      if(isMainThread && res && res.length) {
+        const worker = new MainWorker('/events/workers/checker.js',res);
+        worker.postMessage(res);
+        const result = await worker.getMessage() as any;
+        hasBadWords = result?.data && result.data
+      } 
+      client.send(JSON.stringify({all: res, hasBadWords}));
+    } catch(e) {
+      console.log('Error==>: ', e);
     }
-    client.send(JSON.stringify({all: res, hasBadWords}));
+  
   }
 
   handleDisconnect(client: any) {
-    console.log('Handle Disc')
+    console.log('Handle Disc', client.userId);
     this.service.destroyClient(client);
   }
-
-  // @SubscribeMessage('init')
-  // onInit(client: any, data: any): any {
-  //   return this.messageModel.find({}, (d) => {
-  //      console.log('Init', d)
-  //      return from(d).pipe(map(item => ({ event: 'events', data: item })));
-  //   })
-  // }
 
   @SubscribeMessage('events')
   async onEvent(client: any, data: IMessage) {
     console.log('onEvent', client.userId, typeof data, data);
-    this.messageModel.create({
+    await this.service.sendMessage(client.userId, data, false);
+    await this.messageModel.create({
       userId: client.userId,
       text: data.content,
       date: data.date,
     });
-    await this.service.sendMessage(client.userId, data, false);
   }
 }

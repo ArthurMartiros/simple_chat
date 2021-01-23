@@ -1,12 +1,35 @@
 version: '3'
 services:
-  myapp:
-    container_name: myapp
+  myapp1:
+    container_name: myapp1
     restart: always
     build: .
-    ports:
-      - '8888:8888'
-      - '7777:8888'
+    # ports:
+    #   - '8888:8888'
+    healthcheck:
+      test: "exit 0"  
+    environment:
+      - CHANNEL_PREFIX=CHANNEL_
+      - NODE_ENV=prod
+      - DB_DIALECT=mongodb
+      - DB_HOST=mongo
+      - DB_PORT=27018
+      - DB_DATABASE=chat
+      - REDIS_HOST=redis
+      - REDIS_PORT=6380
+    depends_on:
+      - redis
+      - mongo
+    networks:
+      - app
+  myapp2:
+    container_name: myapp2
+    restart: always
+    build: .
+    # ports:
+    #   - '7777:8888'
+    healthcheck:
+      test: "exit 0"  
     environment:
       - CHANNEL_PREFIX=CHANNEL_
       - NODE_ENV=prod
@@ -21,6 +44,7 @@ services:
       - mongo
     networks:
       - app  
+
   mongo:
     container_name: myapp-mongo
     image: 'mongo:4'
@@ -40,7 +64,17 @@ services:
     ports:
       - '6380:6380'      
     networks:
-      - app  
+      - app
+
+  loadbalancer:
+    build: ./nginx
+    ports:
+      - '8888:8081'
+    depends_on:
+      - myapp1
+      - myapp2
+    networks:
+      - app
 
 networks:
   app:
